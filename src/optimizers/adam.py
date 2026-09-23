@@ -17,18 +17,15 @@ class Adam(Optimizer):
         self.m = [np.zeros_like(p) for p in params]
         self.v = [np.zeros_like(p) for p in params]
 
-# Kolla igenom denna?
-# vad används idx för, vad är i?
-# Måste p loopas igenom (kan man inte göra vektoroperationer)?
     def step(self):
         self.t += 1 
         idx = 0
         for p in self.params:
             g = p.grad
-            self.m[i] = self.beta1*self.m[i] + (1-self.beta1)*g 
-            self.v[i] = self.beta2*self.v[i] + (1-self.beta2)*g**2
-            m_hat = self.m[i]/(1-self.beta1**self.t)
-            v_hat = self.v[i]/(1-self.beta2**self.t)
+            self.m[idx] = self.beta1*self.m[idx] + (1-self.beta1)*g 
+            self.v[idx] = self.beta2*self.v[idx] + (1-self.beta2)*g**2
+            m_hat = self.m[idx]/(1-self.beta1**self.t)
+            v_hat = self.v[idx]/(1-self.beta2**self.t)
             if self.lambd != 0: # Weight decay
                 p = p - self.alpha*self.lambd*p
             p = p - self.alpha*m_hat/(np.sqrt(v_hat)+self.eps)
