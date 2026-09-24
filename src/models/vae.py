@@ -16,8 +16,8 @@ class VAE(nn.Module):
         self.linear_logsigma = nn.Linear(hidden_dims,latent_dims)
 
         self.linear_decoder = nn.Linear(latent_dims,hidden_dims)
-        # Skapa lager för likelihood eller för decode_mu, decode_sigma?
-        # self.likelihood = nn.Linear(hidden_dims,input_dims)
+        self.linear_mu_x = nn.Linear(hidden_dims, input_dims)
+        self.linear_logsigma_x = nn.Linear(hidden_dims, input_dims)
 
     def encode(self, x):
         h = torch.tanh(self.linear_encoder(x))
@@ -29,13 +29,20 @@ class VAE(nn.Module):
         return mu + eps*std # = z
     
     def decode(self,z):
-        pass # output x eller mu_x, logsigma_x?
-
+        h = torch.tanh(self.linear_decoder(z))
+        mu_x = torch.sigmoid(self.linear_mu_x(h))
+        logsigma_x = torch.sigmoid(self.linear_logsigma_x(h))
+        return mu_x, logsigma_x
+    
     def forward(self, x):
-        mu, logsigma = self.encode(x)
+        mu_z, logsigma_z = self.encode(x)
         z = self.reparametrize(mu,logsigma)
-        pass
-        # Decode part?
+        mu_x,logsigma_x = decode(z)
+        return mu_x,logsigma_x,mu_z,logsigma_z
 
-    def loss_function(self):
-        pass
+    def loss_function(self,x):
+        mu_x,logsigma_x,mu_z,logsigma_z = self.forward(x)
+        kl = 1/2*(torch.exp(logsigma_z) + mu_z**2 -1-logsigma_z).sum(dim = 1)
+        ev = 1/2*(torch.log(2*torch.pi)+logsigma_x+(x-mu_x)/np.exp(logsigma_x)).sum(dim = 1)
+        loss = -kl - ev
+        return loss
