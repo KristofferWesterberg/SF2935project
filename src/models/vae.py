@@ -36,13 +36,13 @@ class VAE(nn.Module):
     
     def forward(self, x):
         mu_z, logsigma_z = self.encode(x)
-        z = self.reparametrize(mu,logsigma)
-        mu_x,logsigma_x = decode(z)
+        z = self.reparametrize(mu_z,logsigma_z)
+        mu_x,logsigma_x = self.decode(z)
         return mu_x,logsigma_x,mu_z,logsigma_z
 
     def loss_function(self,x):
         mu_x,logsigma_x,mu_z,logsigma_z = self.forward(x)
         kl = 1/2*(torch.exp(logsigma_z) + mu_z**2 -1-logsigma_z).sum(dim = 1)
-        ev = 1/2*(torch.log(2*torch.pi)+logsigma_x+(x-mu_x)/np.exp(logsigma_x)).sum(dim = 1)
+        ev = 1/2*(torch.log(2*torch.pi)+logsigma_x+(x-mu_x)/torch.exp(logsigma_x)).sum(dim = 1)
         loss = -kl - ev
         return loss

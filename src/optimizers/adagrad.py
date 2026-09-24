@@ -16,7 +16,7 @@ class Adagrad(Optimizer):
     def step(self):
         t = 1
         state_sum = self.tau
-        for p in params:
+        for p in self.params:
             g = p.grad
             gamma_tilde = self.gamma/(1+(t-1)*self.eta)
             if self.lambd != 0:

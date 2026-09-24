@@ -7,7 +7,7 @@ class Optimizer():
         self.params = params
 
     def zero_grad(self):
-        for p in params:
+        for p in self.params:
             p.grad = 0
 
     def step(self):
