@@ -143,7 +143,7 @@ def train(train_loader, test_loader, epcs, model, optimizer):
 
         print(f'EPOCH: {epc+1} / {epcs}')
 
-        for i, data in enumerate(train_loader):
+        for  (data,) in train_loader:
             loss = train_one_step(optimizer, model, data)
             #print(f' batch: {i+1}, loss: {loss}')
 
@@ -181,13 +181,27 @@ def parse_data(train_size, dataset, batch_size):
 
 def main():
 
-    # input_dims = 
-    # hidden_dims = 
-    # latent_dims =
+    # check correct code? why does the elbo train return negative values?
+    torch.manual_seed(0)
+    device = torch.device("cpu")
+
+    input_dims = 560          
+    hidden_dims = 200
+    latent_dims = 5
+    batch_size = 100
+    epochs = 5
+ 
+    dataset = load_data("src/data/frey_rawface.mat")
+    print(".")
+    train_loader, test_loader = parse_data(0.9, dataset, batch_size)
+
+    model = VAE(input_dims, hidden_dims, latent_dims)
+    optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
+
+    samples, elbo_train, elbo_test = train(train_loader, test_loader, epochs, model, optimizer)
 
 
-
-
+    print(elbo_train)
 
 
 
