@@ -3,7 +3,10 @@ import torch.nn as nn
 from scipy.io import loadmat
 from torch.utils.data import TensorDataset, DataLoader, random_split
 from torch.optim import Optimizer
+import matplotlib.pyplot as plt
+import numpy as np
 import math
+import copy
 
 class VAE(nn.Module):
 
@@ -48,9 +51,10 @@ class VAE(nn.Module):
         """
         Return the positive ELBO value
         """
+        pi = torch.Tensor([math.pi])
         mu_x,logsigma_x,mu_z,logsigma_z = self.forward(x)
         kl = -1/2*(1+ logsigma_z - torch.exp(logsigma_z) - mu_z**2 ).sum(dim = 1)
-        ev = -1/2*(math.log(2*math.pi)+logsigma_x+(x-mu_x)**2/torch.exp(logsigma_x)).sum(dim = 1)
+        ev = -1/2*(torch.log(2*pi)+logsigma_x+(x-mu_x)**2/torch.exp(logsigma_x)).sum(dim = 1)
         loss = (ev - kl).mean()
         return loss
 
@@ -65,34 +69,37 @@ class Adagrad(Optimizer):
         self.tau = tau
         self.eta = eta
         self.eps = eps
+        self.state_sum =[]
 
     def step(self):
         t = 1
-        state_sum = self.tau
-        for p in self.params:
+        for idx,p in enumerate(self.params):
             g = p.grad
             gamma_tilde = self.gamma/(1+(t-1)*self.eta)
             if self.lambd != 0:
                 g = g + self.lambd*p 
-            state_sum += g**2
-            p = p - gamma_tilde*gamma_tilde*g/(np.sqrt(state_sum)+self.eps)
+            self.state_sum[idx] += g**2
+            p.data -= gamma_tilde*g/(np.sqrt(self.state_sum[idx])+self.eps)
 
 class Adam(Optimizer):
     '''
     See https://arxiv.org/pdf/1412.6980 for lambd = 0 and for lambda != 0 (i.e weight decay) see https://arxiv.org/pdf/1711.05101 (we dont test the L_2 reg)
     '''
 
-    def __init__(self,params, alpha, beta1, beta2, eps, lambd = 0):
-        super().__init__(params)
+    def __init__(self,params, alpha, beta1 = 0.9, beta2 = 0.99, eps = 1e-8, lambd = 0):
+        params = list(params)
+        super().__init__(params, defaults= {})
+        self.params = params
         self.alpha = alpha
         self.beta1 = beta1
         self.beta2 = beta2
         self.eps = eps
         self.lambd = lambd
         self.t = 0 
-        self.m = [np.zeros_like(p) for p in params]
-        self.v = [np.zeros_like(p) for p in params]
+        self.m = [torch.zeros_like(p) for p in params]
+        self.v = [torch.zeros_like(p) for p in params]
 
+    @torch.no_grad()
     def step(self):
         self.t += 1 
         idx = 0
@@ -103,8 +110,8 @@ class Adam(Optimizer):
             m_hat = self.m[idx]/(1-self.beta1**self.t)
             v_hat = self.v[idx]/(1-self.beta2**self.t)
             if self.lambd != 0: # Weight decay
-                p = p - self.alpha*self.lambd*p
-            p = p - self.alpha*m_hat/(np.sqrt(v_hat)+self.eps)
+                p -= self.alpha*self.lambd*p
+            p -=  self.alpha*m_hat/(torch.sqrt(v_hat)+self.eps)
             idx +=1 
 
 # class Muon: Implement later
@@ -119,6 +126,8 @@ def train_one_step(optimizer,model,data):
     optimizer.step()
     return loss.item()
 
+
+# is this correct?
 @torch.no_grad
 def evaluate_elbo(data_loader, model):
     """
@@ -181,7 +190,6 @@ def parse_data(train_size, dataset, batch_size):
 
 def main():
 
-    # check correct code? why does the elbo train return negative values?
     torch.manual_seed(0)
     device = torch.device("cpu")
 
@@ -189,19 +197,36 @@ def main():
     hidden_dims = 200
     latent_dims = 5
     batch_size = 100
-    epochs = 5
+    epochs = 1000
  
     dataset = load_data("src/data/frey_rawface.mat")
-    print(".")
     train_loader, test_loader = parse_data(0.9, dataset, batch_size)
 
-    model = VAE(input_dims, hidden_dims, latent_dims)
-    optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
+    base = VAE(input_dims, hidden_dims, latent_dims)
+    for p in base.parameters():
+        nn.init.normal_(p, mean=0.0, std=0.1)
 
-    samples, elbo_train, elbo_test = train(train_loader, test_loader, epochs, model, optimizer)
+    # same starting weights both models
+    model_adagrad = base   
+    model_adam    = copy.deepcopy(base)
+
+    adagrad = torch.optim.Adagrad(model_adagrad.parameters(), lr=0.01)
+    adam = Adam(model_adam.parameters(), 0.01)
+
+    torch.manual_seed(1) 
+    elbo_adagrad_train, elbo_adagrad_test, samples = train(train_loader, test_loader, epochs, model_adagrad, adagrad)
+    torch.manual_seed(1) 
+    elbo_adam_train, elbo_adam_test, _ = train(train_loader, test_loader, epochs, model_adam, adam)
 
 
-    print(elbo_train)
+    plt.figure()
+    plt.plot(samples,elbo_adagrad_train, "r")
+    plt.plot(samples, elbo_adagrad_test, "r--")
+    plt.plot(samples,elbo_adam_train, "b")
+    plt.plot(samples, elbo_adam_test, "b--")
+    plt.xscale("log")
+
+    plt.show()
 
 
 

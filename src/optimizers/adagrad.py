@@ -1,4 +1,4 @@
-from optim import Optimizer
+from torch.optim import Optimizer
 import numpy as np
 
 class Adagrad(Optimizer):

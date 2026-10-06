@@ -1,16 +1,15 @@
-import torch
-from models.vae import VAE
-from utils.dataparser import load_yaml, load_data, parse_data
-from engine.trainer import train
-import argparse
 from pathlib import Path
-
+import torch
+from src.models.vae import VAE
+from src.utils.dataparser import load_yaml, load_data, parse_data
+from src.engine.trainer import train
+import argparse
 
 
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config.yaml")
+    parser.add_argument("--config", type=str, default="base.yaml")
     args = parser.parse_args()
 
     cfg = load_yaml(args.config)
@@ -25,7 +24,7 @@ def main():
     latent_dims = int(train_cfg.get("latent_dim",1))
     train_size = float(train_cfg.get("train_size", 0.8))
 
-    path = Path(data_cfg.get("path", "/SF2935project/data"))
+    path = Path(data_cfg.get("path", "src/data"))
     file_name = str(data_cfg.get("file", "frey_rawface.mat"))
 
     data_path = path / file_name
