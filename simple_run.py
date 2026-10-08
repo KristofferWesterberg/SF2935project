@@ -58,28 +58,30 @@ class VAE(nn.Module):
         loss = (ev - kl).mean()
         return loss
 
-class Adagrad(Optimizer):
-    ''' 
-    We use the same notation as in "https://docs.pytorch.org/docs/2.14/generated/torch.optim.Adagrad.html"
-    '''
-    def __init__(self, params, gamma, lambd, tau, eta,eps):
-        super().__init__(params)
-        self.gamma = gamma
-        self.lambd = lambd
-        self.tau = tau
-        self.eta = eta
-        self.eps = eps
-        self.state_sum =[]
+# DO NOT SEND IN!!!!
+# class Adagrad(Optimizer):
+#     ''' 
+#     We use the same notation as in "https://docs.pytorch.org/docs/2.14/generated/torch.optim.Adagrad.html"
+#     '''
+#     def __init__(self, params, gamma, lambd, tau, eta,eps):
+#         super().__init__(params)
+#         self.gamma = gamma
+#         self.lambd = lambd
+#         self.tau = tau
+#         self.eta = eta
+#         self.eps = eps
+#         self.state_sum =[]
 
-    def step(self):
-        t = 1
-        for idx,p in enumerate(self.params):
-            g = p.grad
-            gamma_tilde = self.gamma/(1+(t-1)*self.eta)
-            if self.lambd != 0:
-                g = g + self.lambd*p 
-            self.state_sum[idx] += g**2
-            p.data -= gamma_tilde*g/(np.sqrt(self.state_sum[idx])+self.eps)
+#     def step(self):
+#         t = 1
+#         for idx,p in enumerate(self.params):
+#             g = p.grad
+#             gamma_tilde = self.gamma/(1+(t-1)*self.eta)
+#             if self.lambd != 0:
+#                 g = g + self.lambd*p 
+#             self.state_sum[idx] += g**2
+#             p.data -= gamma_tilde*g/(np.sqrt(self.state_sum[idx])+self.eps)
+
 
 class Adam(Optimizer):
     '''
@@ -126,12 +128,11 @@ def train_one_step(optimizer,model,data):
     optimizer.step()
     return loss.item()
 
-
-# is this correct?
 @torch.no_grad
 def evaluate_elbo(data_loader, model):
     """
-    Evaluate the ELBO for current epoch
+    Evaluate the ELBO for current epoch.
+    Return avg ELBO per datapoint in the dataset
     """
     tot_elbo = 0.0
     tot_samples = 0
@@ -197,12 +198,12 @@ def main():
     hidden_dims = 200
     latent_dims = 5
     batch_size = 100
-    epochs = 1000
+    epochs = 2000
  
     dataset = load_data("src/data/frey_rawface.mat")
     train_loader, test_loader = parse_data(0.9, dataset, batch_size)
 
-    base = VAE(input_dims, hidden_dims, latent_dims)
+    base = VAE(input_dims, hidden_dims, latent_dims).to(device)
     for p in base.parameters():
         nn.init.normal_(p, mean=0.0, std=0.1)
 
@@ -211,19 +212,24 @@ def main():
     model_adam    = copy.deepcopy(base)
 
     adagrad = torch.optim.Adagrad(model_adagrad.parameters(), lr=0.01)
-    adam = Adam(model_adam.parameters(), 0.01)
+    adam = Adam(model_adam.parameters(), 1e-3)
 
     torch.manual_seed(1) 
     elbo_adagrad_train, elbo_adagrad_test, samples = train(train_loader, test_loader, epochs, model_adagrad, adagrad)
     torch.manual_seed(1) 
-    elbo_adam_train, elbo_adam_test, _ = train(train_loader, test_loader, epochs, model_adam, adam)
+    elbo_adam_train, elbo_adam_test, samples = train(train_loader, test_loader, epochs, model_adam, adam)
 
 
     plt.figure()
-    plt.plot(samples,elbo_adagrad_train, "r")
-    plt.plot(samples, elbo_adagrad_test, "r--")
-    plt.plot(samples,elbo_adam_train, "b")
-    plt.plot(samples, elbo_adam_test, "b--")
+    plt.plot(samples, elbo_adagrad_train, color='darkred', linestyle='-', label='Adagrad train')
+    plt.plot(samples, elbo_adagrad_test, color='red', linestyle='--', label='Adagrad test')
+    plt.plot(samples, elbo_adam_train, color='blue', linestyle='-', label='Adam train')
+    plt.plot(samples, elbo_adam_test, color='cyan', linestyle='--', label='Adam test')
+    plt.title("$N_z$ = 5: Adagrad vs Adam")
+    plt.ylabel('ELBO')
+    plt.xlabel('Training samples')
+    plt.legend()
+
     plt.xscale("log")
 
     plt.show()
